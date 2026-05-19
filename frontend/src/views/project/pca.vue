@@ -1,10 +1,8 @@
 <template>
   <div class="pca-page">
-    <!-- 顶部进度导航 -->
     <StepFlow currentStep="QC_DONE" />
 
     <div class="pca-layout">
-      <!-- 1. 左侧：控制与配置 -->
       <aside class="pca-aside">
         <div class="card-config">
           <h3>PCA 结构校正配置</h3>
@@ -37,20 +35,23 @@
           </button>
         </div>
 
-        <div class="outlier-card">
+        <div class="outlier-card" v-if="outliers.length > 0">
           <h4>异常值检测 (Outliers)</h4>
-          <p class="hint">系统自动识别出 4 个偏离主群体的样本。</p>
+          <p class="hint">系统识别出 {{ outliers.length }} 个偏离主群体的样本。</p>
           <div class="outlier-list">
             <div v-for="s in outliers" :key="s.id" class="outlier-item">
               <span>{{ s.name }}</span>
-              <button class="remove-btn">排除</button>
+              <button class="remove-btn" @click="removeOutlier(s.id)">排除</button>
             </div>
           </div>
-          <button class="batch-remove">一键排除所有异常点</button>
+          <button class="batch-remove" @click="removeAllOutliers">一键排除所有异常点</button>
+        </div>
+        <div class="outlier-card" v-else>
+          <h4>异常值检测 (Outliers)</h4>
+          <p class="hint">未检测到异常样本，数据质量良好。</p>
         </div>
       </aside>
 
-      <!-- 2. 右侧：交互式散点图 -->
       <main class="pca-main">
         <div class="viz-card">
           <div class="card-header">
@@ -81,7 +82,6 @@
           </div>
         </div>
 
-        <!-- PC 方差解释贡献图 (Scree Plot) -->
         <div class="scree-card">
           <h4>碎石图 (Scree Plot) - 特征值贡献度</h4>
           <div class="scree-bars">
@@ -126,6 +126,14 @@ const outliers = ref([
 
 const varianceExplained = ref([42.5, 18.2, 10.4, 5.1, 3.2, 2.1, 1.5, 1.1])
 
+const removeOutlier = (id: number) => {
+  outliers.value = outliers.value.filter(o => o.id !== id)
+}
+
+const removeAllOutliers = () => {
+  outliers.value = []
+}
+
 const loadPcaData = async () => {
   if (!projectStore.currentProjectId) return
   loading.value = true
@@ -161,29 +169,34 @@ onMounted(() => {
 
 .pca-layout {
   display: grid;
-  grid-template-columns: 320px 1fr;
+  grid-template-columns: 300px 1fr;
   gap: 24px;
   margin-top: 24px;
 }
 
-/* 左侧配置 */
 .card-config, .outlier-card {
   background: var(--card-bg);
-  padding: 24px;
+  padding: 20px;
   border-radius: var(--border-radius-lg);
   border: 1px solid var(--border-color);
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .config-item {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .config-item label {
   display: block;
   font-size: 13px;
   font-weight: 600;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
+}
+
+.hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
 }
 
 .config-item input, .axis-select select {
@@ -201,17 +214,18 @@ onMounted(() => {
 
 .recalc-btn {
   width: 100%;
-  padding: 12px;
+  padding: 10px;
   background: var(--primary-color);
   color: white;
   border: none;
   border-radius: 6px;
   cursor: pointer;
+  font-weight: 500;
 }
 
 .outlier-list {
-  margin: 15px 0;
-  max-height: 200px;
+  margin: 12px 0;
+  max-height: 180px;
   overflow-y: auto;
 }
 
@@ -219,10 +233,10 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px;
+  padding: 6px 10px;
   background: #fff1f2;
   border-radius: 4px;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   font-size: 12px;
 }
 
@@ -233,24 +247,49 @@ onMounted(() => {
   padding: 2px 8px;
   border-radius: 4px;
   cursor: pointer;
+  font-size: 11px;
+}
+.remove-btn:hover {
+  background: #e11d48;
+  color: white;
 }
 
 .batch-remove {
   width: 100%;
-  background: #f8fafc;
-  border: 1px solid var(--border-color);
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+  color: #e11d48;
   padding: 8px;
   font-size: 12px;
+  border-radius: 4px;
   cursor: pointer;
+  font-weight: 500;
+}
+.batch-remove:hover {
+  background: #e11d48;
+  color: white;
 }
 
-/* 右侧图表 */
 .viz-card, .scree-card {
   background: var(--card-bg);
-  padding: 24px;
+  padding: 20px;
   border-radius: var(--border-radius-lg);
   border: 1px solid var(--border-color);
-  margin-bottom: 24px;
+  margin-bottom: 20px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.card-header h4 {
+  margin: 0;
+  font-size: 15px;
 }
 
 .chart-container {
@@ -260,8 +299,9 @@ onMounted(() => {
 
 .legend {
   display: flex;
-  gap: 15px;
+  gap: 12px;
   font-size: 12px;
+  align-items: center;
 }
 
 .dot {
@@ -269,24 +309,25 @@ onMounted(() => {
   height: 10px;
   border-radius: 50%;
   display: inline-block;
+  flex-shrink: 0;
 }
 .cases { background: #ef4444; }
 .controls { background: #3b82f6; }
 
 .pca-explanation {
-  margin-top: 20px;
-  padding: 15px;
+  margin-top: 16px;
+  padding: 12px;
   background: #f0f9ff;
   border-left: 4px solid #0ea5e9;
   font-size: 13px;
   line-height: 1.6;
+  border-radius: 0 4px 4px 0;
 }
 
-/* 碎石图 */
 .scree-bars {
   display: flex;
   align-items: flex-end;
-  gap: 15px;
+  gap: 12px;
   height: 120px;
   padding-top: 20px;
 }
@@ -296,6 +337,7 @@ onMounted(() => {
   flex-direction: column;
   align-items: center;
   flex: 1;
+  min-width: 0;
 }
 
 .bar {
@@ -306,8 +348,8 @@ onMounted(() => {
 }
 
 .bar-label {
-  font-size: 11px;
-  margin-top: 8px;
+  font-size: 10px;
+  margin-top: 6px;
   color: var(--text-muted);
 }
 
@@ -317,5 +359,11 @@ onMounted(() => {
   justify-content: center;
   height: 300px;
   color: var(--text-muted);
+}
+
+@media (max-width: 900px) {
+  .pca-layout {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
