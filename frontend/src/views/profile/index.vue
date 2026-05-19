@@ -9,13 +9,13 @@
               <img :src="userStore.userInfo.avatar" alt="Avatar" />
             </div>
             <div v-else class="avatar-placeholder">
-              {{ userStore.initials }}
+              {{ (userStore.userInfo?.nickname || '研')[0] }}
             </div>
             <button class="edit-avatar-btn">更换头像</button>
           </div>
           <h2 class="username">{{ userStore.userInfo?.nickname || '研究员' }}</h2>
           <p class="user-role">
-            <StatusTag type="primary" :label="userStore.userInfo?.role.toUpperCase()" />
+            <StatusTag type="primary" :label="(userStore.userInfo?.role || 'USER').toUpperCase()" />
           </p>
           <div class="user-meta">
             <div class="meta-item">
