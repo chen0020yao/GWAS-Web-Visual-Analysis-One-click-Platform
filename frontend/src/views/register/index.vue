@@ -79,7 +79,20 @@ const passwordMatch = computed(() => {
 })
 
 const handleRegister = async () => {
-  if (!passwordMatch.value) return
+  if (!passwordMatch.value) {
+    alert('两次输入的密码不一致')
+    return
+  }
+
+  if (!form.email.includes('@')) {
+    alert('请输入有效的邮箱地址')
+    return
+  }
+
+  if (form.password.length < 6) {
+    alert('密码长度不能少于6位')
+    return
+  }
 
   loading.value = true
 
@@ -93,7 +106,8 @@ const handleRegister = async () => {
     alert('注册成功！请登录')
     router.push('/login')
   } catch (err: any) {
-    const msg = err.response?.data?.detail || '注册失败，请检查网络或邮箱是否已被占用'
+    // 响应拦截器已经把后端错误提取为 message 字符串
+    const msg = err.message || '注册失败，请检查网络连接'
     alert(msg)
   } finally {
     loading.value = false

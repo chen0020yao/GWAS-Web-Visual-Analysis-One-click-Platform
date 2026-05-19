@@ -122,7 +122,7 @@ const handleLogin = async () => {
     const redirectPath = (route.query.redirect as string) || '/dashboard'
     router.push(redirectPath)
   } catch (err: any) {
-    errorMsg.value = err.response?.data?.message || '登录失败，请检查账号密码或网络连接'
+    errorMsg.value = err.message || '登录失败，请检查网络连接'
   } finally {
     loading.value = false
   }

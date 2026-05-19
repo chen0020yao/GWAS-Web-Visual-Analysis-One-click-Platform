@@ -20,28 +20,43 @@ service.interceptors.request.use(
     (error) => Promise.reject(error)
 )
 
-// 2. 响应拦截器 (彻底简化版)
+// 2. 响应拦截器
 service.interceptors.response.use(
     (response: AxiosResponse) => {
-        // FastAPI 返回的 {access_token: "..."} 就在 response.data 里
-        const res = response.data
-
-        // ⭐ 放弃 res.code 检查，因为 FastAPI 默认不返回这个字段
-        // 只有当后端明确给了错误码（且不是200）时才报错
-        if (res && res.code !== undefined && res.code !== 200) {
-            const msg = res.message || res.error_detail || '业务逻辑错误'
-            return Promise.reject(new Error(msg))
-        }
-
-        // 只要能走到这里，说明 HTTP 状态码是 200，直接返回数据主体
-        return res
+        return response.data
     },
     (error) => {
-        // 处理 401 授权失败（如密码错误或 Token 过期）
-        if (error.response && error.response.status === 401) {
-            console.error('认证失败，请检查账号密码')
+        // 提取后端返回的具体错误信息
+        if (error.response) {
+            const { status, data } = error.response
+
+            if (status === 422 && data?.detail) {
+                // Pydantic 校验失败：detail 是数组 [{loc, msg, type}]
+                const messages = Array.isArray(data.detail)
+                    ? data.detail.map((e: any) => {
+                        const field = e.loc?.join('.') || ''
+                        return field ? `${field}: ${e.msg}` : e.msg
+                    }).join('；')
+                    : data.detail
+                return Promise.reject(new Error(messages))
+            }
+
+            if (status === 401) {
+                return Promise.reject(new Error(data?.detail || '认证失败，请检查账号密码'))
+            }
+
+            if (status === 400) {
+                return Promise.reject(new Error(data?.detail || '请求参数错误'))
+            }
+
+            if (status >= 500) {
+                return Promise.reject(new Error(data?.detail || '服务器内部错误'))
+            }
+
+            return Promise.reject(new Error(data?.detail || `请求失败 (${status})`))
         }
-        return Promise.reject(error)
+
+        return Promise.reject(new Error('网络连接失败，请检查后端服务是否启动'))
     }
 )
 
