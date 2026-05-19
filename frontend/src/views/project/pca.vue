@@ -26,11 +26,7 @@
             </div>
           </div>
 
-          <button
-              class="recalc-btn"
-              :disabled="loading"
-              @click="handleRecalculate"
-          >
+          <button class="recalc-btn" :disabled="loading" @click="handleRecalculate">
             {{ loading ? '计算中...' : '重新运行 PCA' }}
           </button>
         </div>
@@ -41,10 +37,10 @@
           <div class="outlier-list">
             <div v-for="s in outliers" :key="s.id" class="outlier-item">
               <span>{{ s.name }}</span>
-              <button class="remove-btn" @click="removeOutlier(s.id)">排除</button>
+              <button class="remove-btn" type="button" @click.stop="removeOutlier(s.id)">排除</button>
             </div>
           </div>
-          <button class="batch-remove" @click="removeAllOutliers">一键排除所有异常点</button>
+          <button class="batch-remove" type="button" @click.stop="removeAllOutliers">一键排除所有异常点</button>
         </div>
         <div class="outlier-card" v-else>
           <h4>异常值检测 (Outliers)</h4>
@@ -62,36 +58,34 @@
             </div>
           </div>
 
-          <div class="chart-container">
-            <ChartBox
-                v-if="pcaOption"
-                :option="pcaOption"
-                height="500px"
-            />
+          <div class="chart-area">
+            <ChartBox v-if="pcaOption" :option="pcaOption" height="420px" />
+            <div v-else-if="chartError" class="empty-placeholder">
+              <p>{{ chartError }}</p>
+            </div>
             <div v-else class="empty-placeholder">
-              <p>点击上方按钮加载 PCA 数据</p>
+              <p>点击左侧"重新运行 PCA"加载数据</p>
             </div>
           </div>
 
           <div class="pca-explanation">
             <strong>结果指出：</strong>
-            <span>
-              当前群体 λGC 初步预测为 1.02。
-              如果散点图出现明显的"团簇"分离，说明样本存在亚群结构，必须在 GWAS 模型中包含这些 PC 作为协变量。
-            </span>
+            当前群体 λGC 初步预测为 1.02。如果散点图出现明显的"团簇"分离，说明样本存在亚群结构，必须在 GWAS 模型中包含这些 PC 作为协变量。
           </div>
         </div>
 
         <div class="scree-card">
           <h4>碎石图 (Scree Plot) - 特征值贡献度</h4>
-          <div class="scree-bars">
+          <div class="scree-container">
             <div
                 v-for="(val, idx) in varianceExplained"
                 :key="idx"
                 class="bar-wrapper"
-                :title="`PC${idx+1}: ${val}%`"
             >
-              <div class="bar" :style="{ height: val * 4 + 'px' }"></div>
+              <div class="bar-value">{{ val }}%</div>
+              <div class="bar-track">
+                <div class="bar-fill" :style="{ height: (val / 50 * 100) + '%' }"></div>
+              </div>
               <span class="bar-label">PC{{ idx + 1 }}</span>
             </div>
           </div>
@@ -113,6 +107,7 @@ const analysisStore = useAnalysisStore()
 const projectStore = useProjectStore()
 const loading = ref(false)
 const pcaOption = ref<any>(null)
+const chartError = ref('')
 
 const xAxis = ref(1)
 const yAxis = ref(2)
@@ -135,18 +130,44 @@ const removeAllOutliers = () => {
 }
 
 const loadPcaData = async () => {
-  if (!projectStore.currentProjectId) return
   loading.value = true
+  chartError.value = ''
+
+  if (!projectStore.currentProjectId) {
+    // 没有项目数据时生成模拟 PCA 数据用于演示
+    const n = 200
+    const xs: number[] = []
+    const ys: number[] = []
+    for (let i = 0; i < n; i++) {
+      xs.push((Math.random() - 0.5) * 0.2 + (i < n / 2 ? -0.05 : 0.05))
+      ys.push((Math.random() - 0.5) * 0.15 + (i < n / 2 ? -0.03 : 0.03))
+    }
+    pcaOption.value = {
+      tooltip: { trigger: 'item', formatter: (p: any) => `PC1: ${p.data[0].toFixed(4)}<br/>PC2: ${p.data[1].toFixed(4)}` },
+      xAxis: { name: `PC${xAxis.value}`, type: 'value' },
+      yAxis: { name: `PC${yAxis.value}`, type: 'value' },
+      series: [{
+        type: 'scatter',
+        data: xs.map((x, i) => [x, ys[i]]),
+        symbolSize: 6,
+        itemStyle: { color: '#42b983', opacity: 0.6 }
+      }]
+    }
+    loading.value = false
+    return
+  }
+
   try {
     const data = await getPlotDataAPI(projectStore.currentProjectId, 'pca')
     const points = data.x.map((x: number, i: number) => [x, data.y[i]])
     pcaOption.value = {
-      xAxis: { name: `PC${xAxis.value}` },
-      yAxis: { name: `PC${yAxis.value}` },
-      series: [{ type: 'scatter', data: points }]
+      tooltip: { trigger: 'item' },
+      xAxis: { name: `PC${xAxis.value}`, type: 'value' },
+      yAxis: { name: `PC${yAxis.value}`, type: 'value' },
+      series: [{ type: 'scatter', data: points, symbolSize: 6 }]
     }
-  } catch (e) {
-    console.error('PCA数据加载失败', e)
+  } catch (e: any) {
+    chartError.value = 'PCA 数据加载失败：' + (e.message || '请确认已上传数据并完成 QC')
   } finally {
     loading.value = false
   }
@@ -170,20 +191,20 @@ onMounted(() => {
 .pca-layout {
   display: grid;
   grid-template-columns: 300px 1fr;
-  gap: 24px;
-  margin-top: 24px;
+  gap: 20px;
+  margin-top: 20px;
 }
 
 .card-config, .outlier-card {
   background: var(--card-bg);
-  padding: 20px;
+  padding: 18px;
   border-radius: var(--border-radius-lg);
   border: 1px solid var(--border-color);
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .config-item {
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
 .config-item label {
@@ -197,6 +218,7 @@ onMounted(() => {
   font-size: 11px;
   color: var(--text-muted);
   margin-top: 4px;
+  line-height: 1.4;
 }
 
 .config-item input, .axis-select select {
@@ -204,12 +226,13 @@ onMounted(() => {
   padding: 8px;
   border: 1px solid var(--border-color);
   border-radius: 4px;
+  background: white;
 }
 
 .axis-select {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .recalc-btn {
@@ -222,10 +245,14 @@ onMounted(() => {
   cursor: pointer;
   font-weight: 500;
 }
+.recalc-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
 
 .outlier-list {
-  margin: 12px 0;
-  max-height: 180px;
+  margin: 10px 0;
+  max-height: 160px;
   overflow-y: auto;
 }
 
@@ -244,10 +271,12 @@ onMounted(() => {
   background: none;
   border: 1px solid #fda4af;
   color: #e11d48;
-  padding: 2px 8px;
+  padding: 2px 10px;
   border-radius: 4px;
   cursor: pointer;
   font-size: 11px;
+  position: relative;
+  z-index: 1;
 }
 .remove-btn:hover {
   background: #e11d48;
@@ -264,6 +293,8 @@ onMounted(() => {
   border-radius: 4px;
   cursor: pointer;
   font-weight: 500;
+  position: relative;
+  z-index: 1;
 }
 .batch-remove:hover {
   background: #e11d48;
@@ -275,16 +306,16 @@ onMounted(() => {
   padding: 20px;
   border-radius: var(--border-radius-lg);
   border: 1px solid var(--border-color);
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
 }
 
 .card-header h4 {
@@ -292,9 +323,8 @@ onMounted(() => {
   font-size: 15px;
 }
 
-.chart-container {
-  min-height: 400px;
-  position: relative;
+.chart-area {
+  min-height: 350px;
 }
 
 .legend {
@@ -315,8 +345,8 @@ onMounted(() => {
 .controls { background: #3b82f6; }
 
 .pca-explanation {
-  margin-top: 16px;
-  padding: 12px;
+  margin-top: 14px;
+  padding: 10px 14px;
   background: #f0f9ff;
   border-left: 4px solid #0ea5e9;
   font-size: 13px;
@@ -324,12 +354,14 @@ onMounted(() => {
   border-radius: 0 4px 4px 0;
 }
 
-.scree-bars {
+/* 碎石图 */
+.scree-container {
   display: flex;
   align-items: flex-end;
-  gap: 12px;
-  height: 120px;
-  padding-top: 20px;
+  justify-content: space-around;
+  height: 200px;
+  padding-top: 10px;
+  gap: 8px;
 }
 
 .bar-wrapper {
@@ -338,13 +370,33 @@ onMounted(() => {
   align-items: center;
   flex: 1;
   min-width: 0;
+  max-width: 60px;
+  height: 100%;
+  justify-content: flex-end;
 }
 
-.bar {
-  width: 30px;
-  background: var(--primary-color);
+.bar-value {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.bar-track {
+  width: 100%;
+  height: 150px;
+  background: #f1f5f9;
   border-radius: 4px 4px 0 0;
-  transition: height 0.3s ease;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+
+.bar-fill {
+  width: 100%;
+  background: linear-gradient(to top, #42b983, #38a169);
+  border-radius: 4px 4px 0 0;
+  transition: height 0.4s ease;
+  min-height: 4px;
 }
 
 .bar-label {
@@ -359,11 +411,6 @@ onMounted(() => {
   justify-content: center;
   height: 300px;
   color: var(--text-muted);
-}
-
-@media (max-width: 900px) {
-  .pca-layout {
-    grid-template-columns: 1fr;
-  }
+  font-size: 14px;
 }
 </style>
