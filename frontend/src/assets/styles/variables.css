@@ -1,0 +1,77 @@
+:root {
+    /* --- 核心品牌色 (科研严谨风格) --- */
+    --primary-color: #42b983;          /* GWAS 成功/运行中的主绿色 */
+    --primary-hover: #38a169;
+    --error-color: #ef4444;            /* 报错/格式错误提示红色 */
+    --warning-color: #f59e0b;          /* QC 警告/异常提醒橙色 */
+    --info-color: #3b82f6;             /* 转换中/信息提示蓝色 */
+
+    /* --- 侧边栏布局颜色 (深色调) --- */
+    --sidebar-bg: #1e293b;             /* 侧边栏背景 */
+    --sidebar-item-hover: #334155;     /* 菜单悬停色 */
+    --sidebar-text-active: #f8fafc;    /* 激活文字色（白色） */
+    --sidebar-text-disabled: #64748b;  /* 禁用文字色（灰色，对应你要求的“由灰变黑”中的灰） */
+    --sidebar-border: #334155;
+
+    /* --- 主内容区颜色 --- */
+    --main-bg: #f5f7f9;                /* 全局浅灰背景，突出内容卡片 */
+    --card-bg: #ffffff;
+    --text-main: #334155;              /* 主要文字（黑色，对应“由灰变黑”中的黑） */
+    --text-muted: #94a3b8;             /* 次要说明文字 */
+    --border-color: #e2e8f0;           /* 表格与边框线 */
+
+    /* --- 状态锁逻辑色彩 --- */
+    --status-locked: #64748b;          /* 锁定状态（不可点击） */
+    --status-unlocked: #334155;        /* 解锁状态（可点击） */
+
+    /* --- 尺寸规范 --- */
+    --sidebar-width: 240px;
+    --header-height: 64px;
+    --border-radius-sm: 4px;
+    --border-radius-md: 8px;
+    --border-radius-lg: 12px;
+
+    /* --- 阴影规范 (用于提升卡片质感) --- */
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+
+    /* --- Z-Index 层级 --- */
+    --z-sidebar: 1000;
+    --z-header: 900;
+    --z-modal: 2000;
+}
+
+/* 基础样式重置，确保变量生效 */
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    color: var(--text-main);
+    background-color: var(--main-bg);
+}
+
+/* 全局滚动条美化（科研系统常用：窄而精致） */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}

@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+backend/venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Build output
+dist/
+dist-ssr/
+*.local
+
+# IDE
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment & Secrets
+.env
+*.env
+!.env.example
+
+# Database
+*.db
+*.db-journal
+*.db-wal
+
+# Uploaded data (large files)
+backend/app/data/
+backend/data/
+backend/storage/
+
+# Results
+backend/app/data/results/
+
+# Logs
+logs/
+*.log
