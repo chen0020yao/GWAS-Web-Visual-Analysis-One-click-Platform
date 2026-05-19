@@ -34,7 +34,7 @@
 
           <div class="chart-body">
             <ChartBox
-                :option="option"
+                :options="option"
                 :style="{ height: '500px' }"
                 @chart-click="handleSnpClick"
             />

@@ -59,7 +59,7 @@
           </div>
 
           <div class="chart-area">
-            <ChartBox v-if="pcaOption" :option="pcaOption" height="420px" />
+            <ChartBox v-if="pcaOption" :options="pcaOption" height="420px" />
             <div v-else-if="chartError" class="empty-placeholder">
               <p>{{ chartError }}</p>
             </div>
