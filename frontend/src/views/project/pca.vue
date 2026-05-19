@@ -90,6 +90,11 @@
             </div>
           </div>
         </div>
+
+        <div class="next-step-card">
+          <p>PCA 分析完成，可以进入关联分析了</p>
+          <button class="next-btn" @click="$router.push('/project/gwas')">进入关联分析 →</button>
+        </div>
       </main>
     </div>
   </div>
@@ -412,5 +417,36 @@ onMounted(() => {
   height: 300px;
   color: var(--text-muted);
   font-size: 14px;
+}
+
+.next-step-card {
+  background: var(--card-bg);
+  padding: 20px 24px;
+  border-radius: var(--border-radius-lg);
+  border: 2px solid var(--primary-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.next-step-card p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-main);
+}
+
+.next-btn {
+  padding: 10px 24px;
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.next-btn:hover {
+  background: var(--primary-hover);
 }
 </style>
