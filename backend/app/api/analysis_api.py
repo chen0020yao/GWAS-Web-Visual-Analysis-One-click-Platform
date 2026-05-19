@@ -23,7 +23,8 @@ async def upload(
     try:
         g_path = save_upload_file(file, project_id)
         prefix = vcf_to_plink(g_path, project_id)
-        save_upload_file(phenotype, project_id)
+        pheno_path = save_upload_file(phenotype, project_id)
+        _normalize_phenotype_fid(pheno_path)
         if covariate:
             save_upload_file(covariate, project_id)
         return {
@@ -33,6 +34,18 @@ async def upload(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"后端报错: {str(e)}")
+
+
+def _normalize_phenotype_fid(pheno_path: str):
+    """将表型文件的 FID 列统一为 0，匹配 PLINK2 转换后的 .fam 格式"""
+    import pandas as pd
+    try:
+        df = pd.read_csv(pheno_path, sep=r'\s+')
+        if 'FID' in df.columns:
+            df['FID'] = 0
+            df.to_csv(pheno_path, sep='\t', index=False)
+    except Exception:
+        pass  # 非标准格式则跳过
 
 
 # ====================
@@ -112,8 +125,23 @@ def run(data: dict):
         project_id = data.get("projectId")
         model = data.get("model", "GLM")
         covariates = data.get("covariates", [])
-        qc_prefix = get_project_prefix(project_id) + "_qc"
-        gwas_prefix = run_gwas(qc_prefix, model=model, covariates=covariates)
+
+        prefix = get_project_prefix(project_id)
+        qc_prefix = prefix + "_qc"
+
+        # 优先用 QC 后的数据，没有则用原始数据
+        if not os.path.exists(qc_prefix + ".bed"):
+            qc_prefix = prefix
+
+        # 查找表型文件
+        project_dir = os.path.dirname(prefix)
+        pheno_file = None
+        for f in os.listdir(project_dir):
+            if f.endswith(".txt") and f != "plink.log":
+                pheno_file = os.path.join(project_dir, f)
+                break
+
+        gwas_prefix = run_gwas(qc_prefix, pheno_file=pheno_file, model=model, covariates=covariates)
         return {"msg": "GWAS完成", "data": {"gwas_prefix": gwas_prefix}}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
