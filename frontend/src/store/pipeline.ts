@@ -50,7 +50,7 @@ export const usePipelineStore = defineStore('pipeline', {
                 if (!this.activeTaskId) return this.stopPolling()
 
                 try {
-                    const { data } = await getTaskStatusAPI(this.activeTaskId)
+                    const data = await getTaskStatusAPI(this.activeTaskId)
 
                     this.progress = data.progress
                     this.currentLog = data.message

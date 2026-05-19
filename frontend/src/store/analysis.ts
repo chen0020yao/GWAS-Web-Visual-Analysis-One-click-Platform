@@ -45,7 +45,7 @@ export const useAnalysisStore = defineStore('analysis', {
             this.errorMsg = ''
 
             try {
-                const { data } = await runGWASAnalysisAPI({
+                const data = await runGWASAnalysisAPI({
                     projectId,
                     ...this.qcParams,
                     ...this.modelParams
@@ -64,7 +64,7 @@ export const useAnalysisStore = defineStore('analysis', {
         async pollProgress(taskId: string) {
             const timer = setInterval(async () => {
                 try {
-                    const { data } = await getAnalysisProgressAPI(taskId)
+                    const data = await getAnalysisProgressAPI(taskId)
                     this.progress = data.progress
                     this.statusText = data.log
 
@@ -87,7 +87,7 @@ export const useAnalysisStore = defineStore('analysis', {
         // 获取 QC 后的异常数据报告
         async fetchQCReport(projectId: string) {
             try {
-                const { data } = await getQCReportAPI(projectId)
+                const data = await getQCReportAPI(projectId)
                 this.qcResultSummary = data
                 return data
             } catch (error) {
