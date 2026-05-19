@@ -13,7 +13,7 @@
         <!-- 步骤图标与索引 -->
         <div class="step-node">
           <div class="node-circle">
-            <span v-if="isCompleted(index)">CheckmarkIcon</span>
+            <span v-if="isCompleted(index)" class="check-icon">&#10003;</span>
             <span v-else>{{ index + 1 }}</span>
           </div>
           <div class="node-content">
