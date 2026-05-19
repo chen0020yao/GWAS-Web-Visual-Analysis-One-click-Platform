@@ -133,12 +133,13 @@ def run(data: dict):
         if not os.path.exists(qc_prefix + ".bed"):
             qc_prefix = prefix
 
-        # 查找表型文件
+        # 查找并修正表型文件
         project_dir = os.path.dirname(prefix)
         pheno_file = None
         for f in os.listdir(project_dir):
-            if f.endswith(".txt") and f != "plink.log":
+            if f.endswith(".txt") and f != "plink.log" and "eigen" not in f:
                 pheno_file = os.path.join(project_dir, f)
+                _normalize_phenotype_fid(pheno_file)
                 break
 
         gwas_prefix = run_gwas(qc_prefix, pheno_file=pheno_file, model=model, covariates=covariates)
