@@ -10,3 +10,5 @@ passlib
 duckdb
 gseapy
 requests
+sqlalchemy
+bcrypt
