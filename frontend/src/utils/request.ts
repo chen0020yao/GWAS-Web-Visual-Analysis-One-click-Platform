@@ -3,7 +3,7 @@ import { useUserStore } from '@/store/user'
 
 const service: AxiosInstance = axios.create({
     // 请确保这里的地址和你后端 Uvicorn 运行地址一致
-    baseURL: import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000',
+    baseURL: import.meta.env.VITE_API_BASE_URL || '',
     timeout: 60000
 })
 
