@@ -91,6 +91,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useProjectStore } from '@/store/project'
 import { uploadFileAPI } from '@/api/analysis'
+import { createProjectAPI, updateProjectAPI } from '@/api/project'
 import StepFlow from '@/components/StepFlow.vue'
 import LoadingOverlay from '@/components/LoadingOverlay.vue'
 
@@ -155,6 +156,15 @@ const handleUpload = async () => {
     if (res.code === 200 || res.status === 200) {
       progress.value = 100
       projectStore.step = 'UPLOADED'
+
+      // 同步项目记录到后端数据库
+      try {
+        await createProjectAPI({ id: projectId, name: displayProjectName.value })
+        await updateProjectAPI(projectId, { current_step: 'UPLOADED' })
+        console.log('[Upload] 项目已写入DB:', projectId)
+      } catch (e: any) {
+        console.error('[Upload] DB写入失败:', e?.message || e)
+      }
 
       setTimeout(() => {
         router.push('/project/clean')

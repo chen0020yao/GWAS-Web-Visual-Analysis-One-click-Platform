@@ -3,7 +3,7 @@
     <!-- 顶部用户状态区 -->
     <div class="user-section">
       <div class="avatar-wrapper">
-        <img :src="userStore.userInfo?.avatar || '/default-avatar.png'" class="avatar" />
+        <img :src="userStore.userInfo?.avatar || '/default-avatar.png'" class="avatar" @error="$event.target.style.display='none'" />
         <div class="status-dot" :class="{ online: userStore.isLoggedIn }"></div>
       </div>
       <div class="user-info">
@@ -141,17 +141,23 @@ const handleNewProject = () => {
 const fetchHistory = async () => {
   if (userStore.isLoggedIn) {
     try {
-      const res = await getProjectListAPI()
-      historyList.value = res.data || []
+      const data: any = await getProjectListAPI()
+      historyList.value = Array.isArray(data) ? data : (data?.data || [])
     } catch (e) {
       console.error('Failed to fetch history')
     }
   }
 }
 
-const loadHistoryProject = (id: string) => {
-  // 逻辑：设置 projectStore 的状态并跳转
-  console.log('Load project:', id)
+const loadHistoryProject = async (id: string) => {
+  await projectStore.setCurrentProject(id)
+  const stepMap: Record<string, string> = {
+    'IDLE': '/project/upload',
+    'UPLOADED': '/project/clean',
+    'QC_DONE': '/project/pca',
+    'ANALYSIS_DONE': '/project/visualize',
+  }
+  router.push(stepMap[projectStore.step] || '/project/upload')
 }
 
 const toggleHistory = async () => {

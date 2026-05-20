@@ -11,7 +11,8 @@
           <select v-model="filterStatus" class="status-select">
             <option value="all">所有状态</option>
             <option value="ANALYSIS_DONE">已完成</option>
-            <option value="UPLOADED">进行中</option>
+            <option value="QC_DONE">已质控</option>
+            <option value="UPLOADED">已上传</option>
             <option value="IDLE">待处理</option>
           </select>
           <input
@@ -78,10 +79,23 @@
         </tbody>
       </table>
 
+      <!-- 加载中 -->
+      <div v-if="loading" class="empty-state">
+        <div class="empty-icon">⏳</div>
+        <p>正在加载项目列表...</p>
+      </div>
+
+      <!-- 加载错误 -->
+      <div v-else-if="errorMsg" class="empty-state error">
+        <div class="empty-icon">⚠️</div>
+        <p>{{ errorMsg }}</p>
+        <button class="action-btn view" style="margin-top:12px" @click="fetchProjects">重新加载</button>
+      </div>
+
       <!-- 空状态 -->
-      <div v-if="filteredProjects.length === 0" class="empty-state">
+      <div v-else-if="filteredProjects.length === 0 && !loading" class="empty-state">
         <div class="empty-icon">📂</div>
-        <p>未找到符合条件的分析项目</p>
+        <p>{{ searchQuery || filterStatus !== 'all' ? '未找到符合条件的分析项目' : '还没有任何项目，请先上传数据进行一次分析' }}</p>
       </div>
     </div>
 
@@ -93,9 +107,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useProjectStore } from '@/store/project'
+import { getProjectListAPI, deleteProjectAPI } from '@/api/project'
 import StatusTag from '@/components/StatusTag.vue'
 
 const router = useRouter()
@@ -103,13 +118,57 @@ const projectStore = useProjectStore()
 
 const filterStatus = ref('all')
 const searchQuery = ref('')
+const loading = ref(true)
+const errorMsg = ref('')
 
-// 模拟历史数据
-const projects = ref([
-  { id: 'GWAS_9921', name: '吸烟行为关联分析', step: 'ANALYSIS_DONE', samples: 2500, snps: '1.5M', date: '2026-04-12', lastModified: '2026-05-01' },
-  { id: 'GWAS_8812', name: '身高遗传力研究', step: 'UPLOADED', samples: 500, snps: '800K', date: '2026-04-28', lastModified: '2026-05-02' },
-  { id: 'GWAS_7751', name: '', step: 'IDLE', samples: 0, snps: '0', date: '2026-05-05', lastModified: '2026-05-05' },
-])
+interface ProjectItem {
+  id: string
+  name: string
+  step: string
+  samples: number
+  snps: number
+  date: string
+  lastModified: string
+}
+
+const projects = ref<ProjectItem[]>([])
+
+onMounted(async () => {
+  await fetchProjects()
+})
+
+async function fetchProjects() {
+  loading.value = true
+  errorMsg.value = ''
+  try {
+    const data: any = await getProjectListAPI()
+    const list: any[] = Array.isArray(data) ? data : (data?.data || data?.list || [])
+    projects.value = list.map((p: any) => ({
+      id: p.id || p.ID || '',
+      name: p.name || '',
+      step: p.current_step || p.step || 'IDLE',
+      samples: p.sample_count ?? p.samples ?? 0,
+      snps: p.snp_count ?? p.snps ?? 0,
+      date: formatDate(p.created_at || p.date),
+      lastModified: formatDate(p.updated_at || p.lastModified || p.updatedAt),
+    }))
+  } catch (e: any) {
+    errorMsg.value = e?.message || '加载项目列表失败'
+  } finally {
+    loading.value = false
+  }
+}
+
+function formatDate(raw: string): string {
+  if (!raw) return ''
+  try {
+    const d = new Date(raw)
+    if (isNaN(d.getTime())) return raw
+    return d.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' })
+  } catch {
+    return raw
+  }
+}
 
 const filteredProjects = computed(() => {
   return projects.value.filter(p => {
@@ -120,26 +179,33 @@ const filteredProjects = computed(() => {
 })
 
 const getStatusType = (step: string) => {
-  const map: any = { 'ANALYSIS_DONE': 'success', 'UPLOADED': 'warning', 'IDLE': 'idle' }
+  const map: any = { 'ANALYSIS_DONE': 'success', 'UPLOADED': 'warning', 'QC_DONE': 'info', 'IDLE': 'idle' }
   return map[step] || 'info'
 }
 
 const getStatusLabel = (step: string) => {
-  const map: any = { 'ANALYSIS_DONE': '已完成', 'UPLOADED': '质控中', 'IDLE': '待上传' }
+  const map: any = { 'ANALYSIS_DONE': '已完成', 'QC_DONE': '已质控', 'UPLOADED': '已上传', 'IDLE': '待上传' }
   return map[step] || '未知'
 }
 
-const handleContinue = (item: any) => {
+async function handleContinue(item: ProjectItem) {
   projectStore.setCurrentProject(item.id)
-  // 根据项目当前进度自动跳转到对应的页面
-  if (item.step === 'IDLE') router.push('/project/upload')
-  else if (item.step === 'UPLOADED') router.push('/project/clean')
-  else router.push('/project/visualize')
+  const stepMap: Record<string, string> = {
+    'IDLE': '/project/upload',
+    'UPLOADED': '/project/clean',
+    'QC_DONE': '/project/pca',
+    'ANALYSIS_DONE': '/project/gwas',
+  }
+  router.push(stepMap[item.step] || '/project/upload')
 }
 
-const confirmDelete = (id: string) => {
-  if (confirm(`确定要永久删除项目 ${id} 吗？此操作不可撤销。`)) {
+async function confirmDelete(id: string) {
+  if (!confirm(`确定要永久删除项目 ${id} 吗？此操作不可撤销。`)) return
+  try {
+    await deleteProjectAPI(id)
     projects.value = projects.value.filter(p => p.id !== id)
+  } catch (e: any) {
+    alert('删除失败: ' + (e?.message || '未知错误'))
   }
 }
 </script>

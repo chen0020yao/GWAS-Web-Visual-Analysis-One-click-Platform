@@ -76,38 +76,63 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useProjectStore } from '@/store/project'
+import { getProjectListAPI, getProjectSummaryAPI } from '@/api/project'
 import StatusTag from '@/components/StatusTag.vue'
 
 const router = useRouter()
 const projectStore = useProjectStore()
 
-// 模拟统计数据
-const statistics = [
-  { label: '累计分析样本', value: '1,420', unit: '个', icon: '👤', color: '#42b983' },
-  { label: '显著关联位点', value: '284', unit: 'SNPs', icon: '🧬', color: '#3b82f6' },
-  { label: '占用存储空间', value: '1.2', unit: 'TB', icon: '💾', color: '#f59e0b' },
-  { label: '计算总耗时', value: '45.5', unit: 'h', icon: '⏱️', color: '#8b5cf6' }
-]
-
-// 模拟最近项目列表
-const recentProjects = ref([
-  { id: 'p1', name: 'T2D_GWAS_Phase1', step: 'ANALYSIS_DONE', stepLabel: '已完成', samples: 500, snps: '1.2M', date: '2026-05-01' },
-  { id: 'p2', name: 'Kidney_Disease_Replication', step: 'UPLOADED', stepLabel: '待清洗', samples: 120, snps: '800K', date: '2026-05-05' },
-  { id: 'p3', name: '', step: 'IDLE', stepLabel: '待上传', samples: 0, snps: '0', date: '2026-05-06' }
+const statistics = ref([
+  { label: '累计分析项目', value: 0, unit: '个', icon: '👤', color: '#42b983' },
+  { label: '已完成分析', value: 0, unit: '个', icon: '🧬', color: '#3b82f6' },
 ])
 
+const recentProjects = ref<any[]>([])
+
+const stepLabels: Record<string, string> = {
+  'IDLE': '待上传', 'UPLOADED': '已上传', 'QC_DONE': '已质控', 'ANALYSIS_DONE': '已完成'
+}
+
 const getStatusType = (step: string) => {
-  const map: any = { 'ANALYSIS_DONE': 'success', 'UPLOADED': 'warning', 'IDLE': 'idle' }
+  const map: any = { 'ANALYSIS_DONE': 'success', 'QC_DONE': 'info', 'UPLOADED': 'warning', 'IDLE': 'idle' }
   return map[step] || 'info'
 }
 
-const navigateToProject = (id: string) => {
-  projectStore.setCurrentProject(id)
-  router.push('/project/clean') // 或根据 step 动态跳转
+const navigateToProject = async (id: string) => {
+  await projectStore.setCurrentProject(id)
+  const stepMap: Record<string, string> = {
+    'IDLE': '/project/upload',
+    'UPLOADED': '/project/clean',
+    'QC_DONE': '/project/pca',
+    'ANALYSIS_DONE': '/project/visualize',
+  }
+  router.push(stepMap[projectStore.step] || '/project/upload')
 }
+
+onMounted(async () => {
+  try {
+    const projects: any = await getProjectListAPI()
+    const list = Array.isArray(projects) ? projects : (projects?.data || [])
+    recentProjects.value = list.slice(0, 5).map((p: any) => ({
+      ...p,
+      stepLabel: stepLabels[p.current_step] || '未知',
+      date: p.created_at ? new Date(p.created_at).toLocaleDateString('zh-CN') : '',
+      samples: p.sample_count ?? 0,
+      snps: p.snp_count ?? 0,
+    }))
+  } catch (_) {}
+
+  try {
+    const summary: any = await getProjectSummaryAPI()
+    if (summary) {
+      statistics.value[0].value = summary.total_projects ?? 0
+      statistics.value[1].value = summary.completed ?? 0
+    }
+  } catch (_) {}
+})
 </script>
 
 <style scoped>

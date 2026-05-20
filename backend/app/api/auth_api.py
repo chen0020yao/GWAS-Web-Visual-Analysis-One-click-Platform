@@ -2,10 +2,15 @@ from fastapi import APIRouter, HTTPException, Depends, status, UploadFile, File,
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from typing import Optional
+import os
+import shutil
 from app.db.database import get_db
 from app.models.user import UserDB, UserRegister, UserLogin
 
 router = APIRouter()
+
+AVATAR_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "storage", "avatars")
+os.makedirs(AVATAR_DIR, exist_ok=True)
 
 
 def get_current_user(
@@ -68,13 +73,21 @@ async def login(user: UserLogin, db: Session = Depends(get_db)):
 
 @router.get("/info")
 async def get_user_info(current_user: UserDB = Depends(get_current_user)):
+    # 查找用户头像文件
+    avatar = None
+    if os.path.exists(AVATAR_DIR):
+        for f in os.listdir(AVATAR_DIR):
+            if f.startswith(str(current_user.id) + "."):
+                avatar = f"/api/user/avatar-file/{f}"
+                break
     return {
         "id": current_user.id,
         "username": current_user.email,
         "nickname": current_user.nickname,
         "email": current_user.email,
+        "avatar": avatar,
         "role": "user",
-        "created_at": str(current_user.id)  # simplified
+        "created_at": str(current_user.id)
     }
 
 
@@ -91,12 +104,28 @@ async def update_profile(data: dict, current_user: UserDB = Depends(get_current_
 
 @router.post("/avatar")
 async def upload_avatar(file: UploadFile = File(None), current_user: UserDB = Depends(get_current_user)):
-    return {"message": "头像上传成功", "avatar": f"/storage/avatars/{current_user.id}.jpg"}
+    if not file or not file.filename:
+        raise HTTPException(status_code=400, detail="未选择文件")
+    ext = os.path.splitext(file.filename)[1] or ".jpg"
+    filename = f"{current_user.id}{ext}"
+    filepath = os.path.join(AVATAR_DIR, filename)
+    with open(filepath, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+    return {"message": "头像上传成功", "avatar": f"/api/user/avatar-file/{filename}"}
 
 
 @router.post("/logout")
 async def logout():
     return {"message": "已退出登录"}
+
+
+@router.get("/avatar-file/{filename}")
+async def get_avatar_file(filename: str):
+    from fastapi.responses import FileResponse
+    filepath = os.path.join(AVATAR_DIR, filename)
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="头像不存在")
+    return FileResponse(filepath)
 
 
 @router.post("/password")

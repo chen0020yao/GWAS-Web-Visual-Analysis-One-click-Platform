@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import glob
+from app.services.utils import make_json_safe as _make_json_safe
 
 SIGNIFICANCE = 5e-8
 
@@ -63,23 +64,23 @@ def manhattan_data(prefix):
         for x, y, rs, p in zip(sub["x"], sub["-log10p"], sub["ID"], sub["P"]):
 
             data.append({
-                "value": [x, y],
-                "rsid": rs,
+                "value": [float(x), float(y)],
+                "rsid": str(rs),
                 "p": float(p),
-                "significant": p < SIGNIFICANCE
+                "significant": float(p) < SIGNIFICANCE
             })
 
         groups.append({
-            "chr": c,
+            "chr": int(c),
             "data": data
         })
 
-    return {
+    return _make_json_safe({
         "groups": groups,
         "ticks": ticks,
         "labels": labels,
         "threshold": -np.log10(SIGNIFICANCE)
-    }
+    })
 
 
 # =========================
@@ -96,11 +97,11 @@ def qq_data(prefix):
     chi2 = np.quantile(-2 * np.log(p), 0.5)
     lambda_gc = chi2 / 0.456
 
-    return {
+    return _make_json_safe({
         "expected": expected.tolist(),
         "observed": observed.tolist(),
-        "lambda_gc": round(lambda_gc, 3)
-    }
+        "lambda_gc": lambda_gc
+    })
 
 
 # =========================
@@ -109,10 +110,10 @@ def qq_data(prefix):
 def pca_data(eigenvec_file):
     df = pd.read_csv(eigenvec_file, sep=r'\s+', header=None)
 
-    return {
+    return _make_json_safe({
         "x": df[2].tolist(),
         "y": df[3].tolist()
-    }
+    })
 #===================
 #gene提取
 #==========
@@ -131,4 +132,5 @@ def significant_snps(prefix):
     sig = df[df["P"] < SIGNIFICANCE].copy()
     sig = sig.sort_values("P")
 
-    return sig[["ID", "CHR", "BP", "P"]].to_dict("records")
+    records = sig[["ID", "CHR", "BP", "P"]].to_dict("records")
+    return _make_json_safe(records)

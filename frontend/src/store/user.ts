@@ -49,6 +49,25 @@ export const useUserStore = defineStore('user', {
             }
         },
 
+        async fetchUserInfo() {
+            if (!this.token) return
+            try {
+                const { getUserInfoAPI } = await import('@/api/user')
+                const info: any = await getUserInfoAPI()
+                this.userInfo = {
+                    nickname: info.nickname,
+                    email: info.email,
+                    avatar: info.avatar,
+                    id: info.id,
+                }
+            } catch (_) {
+                // token 过期或用户不存在，清除登录态
+                this.token = ''
+                this.userInfo = null
+                localStorage.removeItem('token')
+            }
+        },
+
         logout() {
             this.token = ''
             this.userInfo = null

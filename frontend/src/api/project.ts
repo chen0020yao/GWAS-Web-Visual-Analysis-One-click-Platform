@@ -22,7 +22,7 @@ export const getProjectDetailAPI = (projectId: string) =>
 
 // 3. 更新项目信息 (重命名/修改昵称)
 // 对应你要求的“未命名按时间命名”，用户可以在此处自定义项目名称
-export const updateProjectAPI = (projectId: string, data: { name: string, description?: string }) =>
+export const updateProjectAPI = (projectId: string, data: { name?: string, description?: string, current_step?: string, sample_count?: number, snp_count?: number }) =>
     request({
         url: `/api/projects/${projectId}`,
         method: 'patch',
@@ -39,7 +39,7 @@ export const deleteProjectAPI = (projectId: string) =>
 
 // 5. 初始化新项目 (空项目占位)
 // 当用户点击“创建新项目”但尚未上传文件时，可以先在后端生成一个 UUID
-export const createProjectAPI = (data: { name?: string }) =>
+export const createProjectAPI = (data: { id?: string, name?: string }) =>
     request({
         url: '/api/projects',
         method: 'post',

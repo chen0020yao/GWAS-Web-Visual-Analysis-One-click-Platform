@@ -33,11 +33,20 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted } from 'vue'
 import { useRoute } from 'vue-router'
+import { useUserStore } from '@/store/user'
 import AppSidebar from '@/components/AppSidebar.vue'
 import AppHeader from '@/components/AppHeader.vue'
 
 const route = useRoute()
+const userStore = useUserStore()
+
+onMounted(() => {
+  if (userStore.token) {
+    userStore.fetchUserInfo()
+  }
+})
 </script>
 
 <style scoped>

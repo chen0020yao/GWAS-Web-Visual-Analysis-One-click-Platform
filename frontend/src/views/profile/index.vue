@@ -11,7 +11,10 @@
             <div v-else class="avatar-placeholder">
               {{ (userStore.userInfo?.nickname || '研')[0] }}
             </div>
-            <button class="edit-avatar-btn">更换头像</button>
+            <input ref="avatarInput" type="file" accept="image/*" style="display:none" @change="handleAvatarUpload" />
+            <button class="edit-avatar-btn" :disabled="avatarUploading" @click="handleAvatarClick">
+              {{ avatarUploading ? '上传中...' : '更换头像' }}
+            </button>
           </div>
           <h2 class="username">{{ userStore.userInfo?.nickname || '研究员' }}</h2>
           <p class="user-role">
@@ -75,7 +78,7 @@
                   </div>
                 </div>
               </div>
-              <button class="save-btn" @click="handleUpdateProfile">保存更改</button>
+              <button class="save-btn" :disabled="saving" @click="handleUpdateProfile">{{ saving ? '保存中...' : '保存更改' }}</button>
             </div>
 
             <!-- 安全设置 -->
@@ -117,10 +120,14 @@
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
 import { useUserStore } from '@/store/user'
+import { updateProfileAPI, uploadAvatarAPI, getUserInfoAPI } from '@/api/user'
 import StatusTag from '@/components/StatusTag.vue'
 
 const userStore = useUserStore()
 const activeTab = ref('account')
+const saving = ref(false)
+const avatarUploading = ref(false)
+const avatarInput = ref<HTMLInputElement | null>(null)
 
 const tabLabelMap: any = {
   account: '账户资料',
@@ -133,10 +140,63 @@ const profileForm = reactive({
   email: userStore.userInfo?.email || ''
 })
 
-const handleUpdateProfile = () => {
-  // 模拟提交
-  console.log('Update Profile:', profileForm)
-  alert('资料更新成功！')
+const handleUpdateProfile = async () => {
+  saving.value = true
+  try {
+    await updateProfileAPI({
+      nickname: profileForm.nickname,
+      email: profileForm.email,
+    })
+    // 刷新 store 中的用户信息
+    await fetchLatestUserInfo()
+    alert('资料更新成功！')
+  } catch (e: any) {
+    alert('更新失败: ' + (e?.message || '未知错误'))
+  } finally {
+    saving.value = false
+  }
+}
+
+const fetchLatestUserInfo = async () => {
+  try {
+    const info: any = await getUserInfoAPI()
+    if (info) {
+      userStore.userInfo = {
+        nickname: info.nickname,
+        email: info.email,
+        avatar: info.avatar,
+        id: info.id,
+      }
+      profileForm.nickname = info.nickname || ''
+      profileForm.email = info.email || ''
+    }
+  } catch (_) {}
+}
+
+const handleAvatarClick = () => {
+  avatarInput.value?.click()
+}
+
+const handleAvatarUpload = async (e: Event) => {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (!file) return
+
+  avatarUploading.value = true
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    await uploadAvatarAPI(formData)
+    // 后端返回 avatar 路径后刷新
+    await fetchLatestUserInfo()
+    // 也更新侧边栏和顶栏
+    if (userStore.userInfo) {
+      userStore.userInfo = { ...userStore.userInfo }
+    }
+  } catch (err: any) {
+    alert('头像上传失败: ' + (err?.message || '未知错误'))
+  } finally {
+    avatarUploading.value = false
+  }
 }
 </script>
 
@@ -179,6 +239,19 @@ const handleUpdateProfile = () => {
   justify-content: center;
   border-radius: 50%;
   margin-bottom: 12px;
+}
+.avatar-img {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  overflow: hidden;
+  margin-bottom: 12px;
+  border: 3px solid var(--primary-color);
+}
+.avatar-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .username {

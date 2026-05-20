@@ -8,7 +8,7 @@ from datetime import datetime
 class ProjectDB(Base):
     __tablename__ = "projects"
 
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    id = Column(String, primary_key=True, index=True)
     name = Column(String, default="")
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     current_step = Column(String, default="IDLE")  # IDLE, UPLOADED, QC_DONE, ANALYSIS_DONE
@@ -20,9 +20,14 @@ class ProjectDB(Base):
 
 
 class ProjectCreate(BaseModel):
+    id: str = ""
     name: str = ""
 
 
 class ProjectUpdate(BaseModel):
     name: str = None
     description: str = None
+    current_step: str = None
+    sample_count: int = None
+    snp_count: int = None
+    phenotype_name: str = None

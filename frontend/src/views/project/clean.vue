@@ -121,11 +121,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useAnalysisStore } from '@/store/analysis'
 import { usePipelineStore } from '@/store/pipeline'
 import { useProjectStore } from '@/store/project'
 import { getQCPreviewAPI, confirmAndRunQCAPI } from '@/api/analysis'
+import { updateProjectAPI } from '@/api/project'
 import StepFlow from '@/components/StepFlow.vue'
 import StatusTag from '@/components/StatusTag.vue'
 import LoadingOverlay from '@/components/LoadingOverlay.vue'
@@ -133,6 +134,10 @@ import LoadingOverlay from '@/components/LoadingOverlay.vue'
 const analysisStore = useAnalysisStore()
 const pipelineStore = usePipelineStore()
 const projectStore = useProjectStore()
+
+onMounted(() => {
+  pipelineStore.resetPipeline()
+})
 
 const hwePower = ref(6)
 
@@ -184,6 +189,12 @@ const handleConfirmClean = async () => {
 
     projectStore.step = 'QC_DONE'
     pipelineStore.taskStatus = 'SUCCESS'
+    try {
+      await updateProjectAPI(projectStore.currentProjectId, { current_step: 'QC_DONE' })
+      console.log('[QC] step已同步到DB')
+    } catch (e: any) {
+      console.error('[QC] DB更新失败:', e?.message || e)
+    }
 
   } catch (err) {
     console.error(err)

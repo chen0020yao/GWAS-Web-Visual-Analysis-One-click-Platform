@@ -61,8 +61,7 @@ export const useProjectStore = defineStore('project', {
         async fetchProjectStatus() {
             if (!this.currentProjectId) return
             try {
-                const res = await getProjectDetailAPI(this.currentProjectId)
-                const data = res.data
+                const data: any = await getProjectDetailAPI(this.currentProjectId)
 
                 this.projectName = data.name
                 this.step = data.current_step as ProjectStep

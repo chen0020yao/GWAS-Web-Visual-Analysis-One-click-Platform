@@ -14,6 +14,8 @@
         </button>
       </div>
       <div class="export-actions">
+        <button class="nav-btn" @click="$router.push('/dashboard')">🏠 返回主页</button>
+        <button class="nav-btn new-project" @click="$router.push('/project/upload')">🆕 新建项目</button>
         <button class="export-btn" @click="downloadReport">📑 导出分析报告</button>
       </div>
     </div>
@@ -33,7 +35,14 @@
           </div>
 
           <div class="chart-body">
+            <div v-if="(tab === 'go' || tab === 'kegg') && enrichLoading" class="enrich-status">
+              <span class="loading-spinner">⏳</span> 正在进行富集分析...
+            </div>
+            <div v-else-if="(tab === 'go' || tab === 'kegg') && enrichError" class="enrich-status error">
+              <span>⚠️</span> {{ enrichError }}
+            </div>
             <ChartBox
+                v-else
                 :options="option"
                 :style="{ height: '500px' }"
                 @chart-click="handleSnpClick"
@@ -149,6 +158,8 @@ const option = ref<any>({})
 const info = ref<any>(null)
 const sigList = ref<any[]>([])
 const lambdaGC = ref(1.02)
+const enrichError = ref('')
+const enrichLoading = ref(false)
 
 const currentTabLabel = computed(() => tabs.find(t => t.key === tab.value)?.label)
 
@@ -225,51 +236,154 @@ watch(tab, async (newTab) => {
   }
 
   if (newTab === 'go') {
-    const data = await getGOAPI(pid)
-    if (Array.isArray(data) && data.length > 0) {
-      option.value = {
-        tooltip: { trigger: 'item' },
-        grid: { left: '25%', right: '10%', bottom: '15%' },
-        xAxis: { name: 'Gene Ratio', type: 'value' },
-        yAxis: { type: 'category', data: data.map((i: any) => i.Term || i.term || '').slice(0, 15).reverse(), axisLabel: { interval: 0, fontSize: 11 } },
-        series: [{
-          type: 'scatter',
-          data: data.map((i: any) => {
-            const overlap = parseFloat(i['Overlap'] || i.overlap || '1/10')
-            const ratio = typeof overlap === 'number' ? overlap : (eval(overlap) || 0.1)
-            return [ratio, i.Term || i.term || '', parseFloat(i['Adjusted P-value'] || i.pvalue || 0.05), i['Adjusted P-value'] || '']
-          }).slice(0, 15).reverse(),
-          symbolSize: (val: any) => Math.max(10, val[0] * 200),
-          itemStyle: { color: (p: any) => parseFloat(p.data[3]) < 0.01 ? '#ef4444' : '#fb923c', opacity: 0.8 }
-        }]
+    enrichLoading.value = true
+    enrichError.value = ''
+    try {
+      const data = await getGOAPI(pid)
+      if (data?.error) {
+        enrichError.value = data.message || data.error
+      } else if (Array.isArray(data) && data.length > 0) {
+        option.value = {
+          tooltip: { trigger: 'item', formatter: (p: any) => `${p.name}<br/>Overlap: ${p.data[2]}<br/>P-adj: ${p.data[3]}` },
+          grid: { left: '35%', right: '10%', bottom: '15%' },
+          xAxis: { name: 'Gene Ratio', type: 'value' },
+          yAxis: { type: 'category', data: data.map((i: any) => i.Term || i.term || '').slice(0, 15).reverse(), axisLabel: { interval: 0, fontSize: 11 } },
+          series: [{
+            type: 'scatter',
+            data: data.map((i: any) => {
+              const overlapStr = i['Overlap'] || i.overlap || '1/10'
+              const parts = overlapStr.split('/')
+              const ratio = parts.length === 2 ? parseFloat(parts[0]) / parseFloat(parts[1]) : parseFloat(overlapStr) || 0.1
+              const pAdj = parseFloat(i['Adjusted P-value'] || i['Adjusted P-value'] || i.pvalue || 0.05)
+              return [ratio, i.Term || i.term || '', overlapStr, pAdj.toExponential(2)]
+            }).slice(0, 15).reverse(),
+            symbolSize: (val: any) => Math.max(10, val[0] * 200),
+            itemStyle: { color: (p: any) => parseFloat(String(p.data[3])) < 0.01 ? '#ef4444' : '#fb923c', opacity: 0.8 }
+          }]
+        }
+      } else {
+        enrichError.value = '未获得显著的GO富集结果（映射到的基因数不足或Enrichr无匹配通路）'
       }
+    } catch (e: any) {
+      enrichError.value = e?.message || 'GO富集请求失败'
+    } finally {
+      enrichLoading.value = false
     }
   }
 
   if (newTab === 'kegg') {
-    const data = await getKEGGAPI(pid)
-    if (Array.isArray(data) && data.length > 0) {
-      option.value = {
-        tooltip: { trigger: 'item' },
-        grid: { left: '25%', right: '10%', bottom: '15%' },
-        xAxis: { name: 'Gene Ratio', type: 'value' },
-        yAxis: { type: 'category', data: data.map((i: any) => i.Term || i.term || '').slice(0, 15).reverse(), axisLabel: { interval: 0, fontSize: 11 } },
-        series: [{
-          type: 'scatter',
-          data: data.map((i: any) => {
-            const overlap = parseFloat(i['Overlap'] || i.overlap || '1/10')
-            const ratio = typeof overlap === 'number' ? overlap : (eval(overlap) || 0.1)
-            return [ratio, i.Term || i.term || '', parseFloat(i['Adjusted P-value'] || i.pvalue || 0.05), i['Adjusted P-value'] || '']
-          }).slice(0, 15).reverse(),
-          symbolSize: (val: any) => Math.max(10, val[0] * 200),
-          itemStyle: { color: (p: any) => parseFloat(p.data[3]) < 0.01 ? '#ef4444' : '#fb923c', opacity: 0.8 }
-        }]
+    enrichLoading.value = true
+    enrichError.value = ''
+    try {
+      const data = await getKEGGAPI(pid)
+      if (data?.error) {
+        enrichError.value = data.message || data.error
+      } else if (Array.isArray(data) && data.length > 0) {
+        option.value = {
+          tooltip: { trigger: 'item', formatter: (p: any) => `${p.name}<br/>Overlap: ${p.data[2]}<br/>P-adj: ${p.data[3]}` },
+          grid: { left: '35%', right: '10%', bottom: '15%' },
+          xAxis: { name: 'Gene Ratio', type: 'value' },
+          yAxis: { type: 'category', data: data.map((i: any) => i.Term || i.term || '').slice(0, 15).reverse(), axisLabel: { interval: 0, fontSize: 11 } },
+          series: [{
+            type: 'scatter',
+            data: data.map((i: any) => {
+              const overlapStr = i['Overlap'] || i.overlap || '1/10'
+              const parts = overlapStr.split('/')
+              const ratio = parts.length === 2 ? parseFloat(parts[0]) / parseFloat(parts[1]) : parseFloat(overlapStr) || 0.1
+              const pAdj = parseFloat(i['Adjusted P-value'] || i['Adjusted P-value'] || i.pvalue || 0.05)
+              return [ratio, i.Term || i.term || '', overlapStr, pAdj.toExponential(2)]
+            }).slice(0, 15).reverse(),
+            symbolSize: (val: any) => Math.max(10, val[0] * 200),
+            itemStyle: { color: (p: any) => parseFloat(String(p.data[3])) < 0.01 ? '#ef4444' : '#fb923c', opacity: 0.8 }
+          }]
+        }
+      } else {
+        enrichError.value = '未获得显著的KEGG富集结果（映射到的基因数不足或Enrichr无匹配通路）'
       }
+    } catch (e: any) {
+      enrichError.value = e?.message || 'KEGG富集请求失败'
+    } finally {
+      enrichLoading.value = false
     }
   }
 }, { immediate: true })
 
-const downloadReport = () => { /* 导出 PDF 逻辑 */ }
+const downloadReport = async () => {
+  const pid = projectStore.currentProjectId
+  if (!pid) return
+
+  // 逐个补齐未加载的数据
+  const fetchers: Record<string, () => Promise<any>> = {
+    manhattan: () => getManhattanAPI(pid),
+    qq: () => getQQAPI(pid),
+    pca: () => getPCAAPI(pid),
+    sig: () => getSignificantSNPAPI(pid),
+    go: () => getGOAPI(pid),
+    kegg: () => getKEGGAPI(pid),
+  }
+
+  const results: any = {}
+  for (const [key, fn] of Object.entries(fetchers)) {
+    try { results[key] = await fn() } catch (_) { results[key] = null }
+  }
+
+  const sigCount = Array.isArray(results.sig) ? results.sig.length : 0
+  const goTerms = Array.isArray(results.go) ? results.go.slice(0, 10) : []
+  const keggTerms = Array.isArray(results.kegg) ? results.kegg.slice(0, 10) : []
+
+  const html = `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>GWAS 分析报告 - ${pid}</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 900px; margin: 0 auto; padding: 40px; color: #1e293b; }
+  h1 { border-bottom: 2px solid #3b82f6; padding-bottom: 12px; }
+  h2 { color: #3b82f6; margin-top: 32px; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+  th { background: #f1f5f9; padding: 8px 12px; text-align: left; font-weight: 600; }
+  td { padding: 8px 12px; border-top: 1px solid #e2e8f0; }
+  .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 16px 0; }
+  .summary-item { background: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0; }
+  .summary-item .value { font-size: 24px; font-weight: 700; color: #3b82f6; }
+  .summary-item .label { font-size: 12px; color: #64748b; }
+  .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8; }
+  .sig { color: #e11d48; font-family: monospace; }
+</style></head><body>
+<h1>GWAS 分析报告</h1>
+<p>项目: ${pid} | 生成时间: ${new Date().toLocaleString()}</p>
+
+<div class="summary-grid">
+  <div class="summary-item"><div class="value">${sigCount}</div><div class="label">显著 SNP (P < 5e-8)</div></div>
+  <div class="summary-item"><div class="value">${results.qq?.lambda_gc || '-'}</div><div class="label">Genomic Inflation (λ)</div></div>
+  <div class="summary-item"><div class="value">${goTerms.length + keggTerms.length}</div><div class="label">富集通路</div></div>
+</div>
+
+<h2>显著 SNP 列表 (Top 50)</h2>
+<table><thead><tr><th>rsID</th><th>Chr</th><th>Position (BP)</th><th>P-value</th></tr></thead><tbody>
+${(Array.isArray(results.sig) ? results.sig.slice(0, 50) : []).map((s: any) =>
+  `<tr><td>${s.ID || '-'}</td><td>${s.CHR}</td><td>${s.BP?.toLocaleString?.() || s.BP}</td><td class="sig">${s.P?.toExponential?.(2) || s.P}</td></tr>`
+).join('')}
+</tbody></table>
+
+<h2>GO 富集分析 (Top 10)</h2>
+${goTerms.length > 0 ? `<table><thead><tr><th>Term</th><th>Overlap</th><th>Adjusted P-value</th></tr></thead><tbody>
+${goTerms.map((i: any) => `<tr><td>${i.Term || i.term || '-'}</td><td>${i.Overlap || i.overlap || '-'}</td><td>${i['Adjusted P-value'] || i.pvalue || '-'}</td></tr>`).join('')}
+</tbody></table>` : '<p>无显著富集条目</p>'}
+
+<h2>KEGG 通路富集 (Top 10)</h2>
+${keggTerms.length > 0 ? `<table><thead><tr><th>Term</th><th>Overlap</th><th>Adjusted P-value</th></tr></thead><tbody>
+${keggTerms.map((i: any) => `<tr><td>${i.Term || i.term || '-'}</td><td>${i.Overlap || i.overlap || '-'}</td><td>${i['Adjusted P-value'] || i.pvalue || '-'}</td></tr>`).join('')}
+</tbody></table>` : '<p>无显著富集条目</p>'}
+
+<div class="footer">由 GWAS Web Visual Analysis Platform 自动生成</div>
+</body></html>`
+
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `GWAS_Report_${pid}_${new Date().toISOString().slice(0, 10)}.html`
+  a.click()
+  URL.revokeObjectURL(url)
+}
 </script>
 
 <style scoped>
@@ -280,6 +394,15 @@ const downloadReport = () => { /* 导出 PDF 逻辑 */ }
   display: flex; justify-content: space-between; align-items: center;
   background: #fff; padding: 12px 24px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
+.export-actions { display: flex; gap: 10px; align-items: center; }
+.export-btn, .nav-btn {
+  padding: 8px 16px; border: none; border-radius: 6px;
+  font-size: 13px; font-weight: 500; cursor: pointer; transition: opacity 0.2s;
+}
+.export-btn { background: #10b981; color: white; }
+.nav-btn { background: #f1f5f9; color: #475569; }
+.nav-btn.new-project { background: var(--primary-color); color: white; }
+.export-btn:hover, .nav-btn:hover { opacity: 0.85; }
 .viz-tabs { display: flex; gap: 8px; }
 .tab-btn {
   padding: 10px 20px; border: none; background: #f1f5f9; border-radius: 8px;
@@ -316,4 +439,11 @@ const downloadReport = () => { /* 导出 PDF 逻辑 */ }
 .highlight { color: var(--primary-color); font-weight: bold; font-size: 18px; }
 .warning { color: #e11d48; font-size: 13px; line-height: 1.4; }
 .math { font-family: "Times New Roman", serif; font-style: italic; }
+.enrich-status {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  height: 500px; color: var(--text-muted); font-size: 15px;
+}
+.enrich-status.error { color: #ef4444; }
+.loading-spinner { animation: spin 1s linear infinite; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 </style>

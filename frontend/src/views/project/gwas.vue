@@ -98,11 +98,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick, computed } from 'vue'
+import { ref, watch, nextTick, computed, onMounted } from 'vue'
 import { useAnalysisStore } from '@/store/analysis'
 import { usePipelineStore } from '@/store/pipeline'
 import { useProjectStore } from '@/store/project'
 import { runGWASAnalysisAPI } from '@/api/analysis'
+import { updateProjectAPI } from '@/api/project'
 import StepFlow from '@/components/StepFlow.vue'
 import StatusTag from '@/components/StatusTag.vue'
 import LoadingOverlay from '@/components/LoadingOverlay.vue'
@@ -110,6 +111,10 @@ import LoadingOverlay from '@/components/LoadingOverlay.vue'
 const analysisStore = useAnalysisStore()
 const pipelineStore = usePipelineStore()
 const projectStore = useProjectStore()
+
+onMounted(() => {
+  pipelineStore.resetPipeline()
+})
 
 const pBase = ref(8)
 const includeSex = ref(true)
@@ -144,23 +149,31 @@ const handleStartGWAS = async () => {
     return
   }
 
+  pipelineStore.taskStatus = 'RUNNING'
   logs.value = ['初始化计算环境...', '检测表型文件格式...', '加载基因型索引...']
 
   try {
-    await runGWASAnalysisAPI({
+    const res: any = await runGWASAnalysisAPI({
       projectId: projectStore.currentProjectId,
-      method: analysisStore.modelParams.method,
+      model: analysisStore.modelParams.method,
       covariates: analysisStore.modelParams.covariates
     })
 
-    pipelineStore.trackTask('gwas_task_' + Date.now())
-    projectStore.step = 'ANALYSIS_DONE'
+    logs.value.push(res?.msg || 'GWAS分析任务已提交完成')
     pipelineStore.taskStatus = 'SUCCESS'
+    projectStore.step = 'ANALYSIS_DONE'
+    try {
+      await updateProjectAPI(projectStore.currentProjectId, { current_step: 'ANALYSIS_DONE' })
+      console.log('[GWAS] step已同步到DB')
+    } catch (e: any) {
+      console.error('[GWAS] DB更新失败:', e?.message || e)
+    }
 
   } catch (e: any) {
     console.error('GWAS分析失败', e)
     pipelineStore.taskStatus = 'FAILED'
     pipelineStore.errorDetail = e.message || '分析任务执行失败'
+    logs.value.push(`错误: ${e.message || '未知错误'}`)
   }
 }
 

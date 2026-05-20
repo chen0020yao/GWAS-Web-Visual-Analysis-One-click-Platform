@@ -4,9 +4,12 @@ from app.services.file_service import save_upload_file, vcf_to_plink, get_projec
 from app.services.qc_service import run_plink_qc, qc_preview_analysis
 from app.services.pca_service import run_pca
 from app.services.gwas_service import run_gwas
-from app.services.plot_service import manhattan_data, qq_data, pca_data, load_gwas_result, significant_snps
+from app.services.plot_service import manhattan_data, qq_data, pca_data, load_gwas_result, significant_snps, SIGNIFICANCE
+
+ENRICH_THRESHOLD = 1e-4  # 富集用宽松阈值，便于低显著性数据也能测试流程
 from app.services.enrichment_service import go_enrichment, kegg_enrichment
 from app.services.annotation_service import query_ncbi_snp
+from app.services.gene_mapper import get_gene_mapper
 
 router = APIRouter()
 
@@ -212,7 +215,16 @@ def enrichment(project_id: str):
     try:
         gwas_prefix = get_project_prefix(project_id) + "_qc"
         df = load_gwas_result(gwas_prefix)
-        genes = df["ID"].astype(str).tolist()
+        sig = df[df["P"] < ENRICH_THRESHOLD].sort_values("P").head(500).copy()
+        if len(sig) == 0:
+            return {"error": "no_significant_snps"}
+
+        mapper = get_gene_mapper()
+        genes = mapper.map_dataframe(sig)
+
+        if len(genes) == 0:
+            return {"error": "no_genes_mapped"}
+
         return {"go": go_enrichment(genes), "kegg": kegg_enrichment(genes)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -223,7 +235,17 @@ def go_enrichment_only(project_id: str):
     try:
         gwas_prefix = get_project_prefix(project_id) + "_qc"
         df = load_gwas_result(gwas_prefix)
-        genes = df["ID"].astype(str).tolist()
+        sig = df[df["P"] < ENRICH_THRESHOLD].sort_values("P").head(500).copy()
+        if len(sig) == 0:
+            return {"error": "no_significant_snps", "message": "未检测到显著SNP，无法进行富集分析"}
+
+        mapper = get_gene_mapper()
+        genes = mapper.map_dataframe(sig)
+        print(f"[GO] project={project_id}, sig_snps={len(sig)}, mapped_genes={len(genes)}, genes={genes[:20]}")
+
+        if len(genes) == 0:
+            return {"error": "no_genes_mapped", "message": "未能将显著SNP映射到基因，BED文件可能未下载完成"}
+
         return go_enrichment(genes)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -234,7 +256,17 @@ def kegg_enrichment_only(project_id: str):
     try:
         gwas_prefix = get_project_prefix(project_id) + "_qc"
         df = load_gwas_result(gwas_prefix)
-        genes = df["ID"].astype(str).tolist()
+        sig = df[df["P"] < ENRICH_THRESHOLD].sort_values("P").head(500).copy()
+        if len(sig) == 0:
+            return {"error": "no_significant_snps", "message": "未检测到显著SNP，无法进行富集分析"}
+
+        mapper = get_gene_mapper()
+        genes = mapper.map_dataframe(sig)
+        print(f"[KEGG] project={project_id}, sig_snps={len(sig)}, mapped_genes={len(genes)}, genes={genes[:20]}")
+
+        if len(genes) == 0:
+            return {"error": "no_genes_mapped", "message": "未能将显著SNP映射到基因，BED文件可能未下载完成"}
+
         return kegg_enrichment(genes)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
